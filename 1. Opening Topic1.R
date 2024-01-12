@@ -75,6 +75,20 @@ pairs(test_p)
 test %>% summary()
 
 
+
+
+### 정규성 가정
+test_p2 <- test_p[sample(nrow(recom), size=5000), ]
+
+
+apply(test_p2, 2, shapiro.test)
+
+
+
+
+
+
+
 # (game) positive_rate와 discount_per의 상관 관계
 
 game %>% names()
@@ -84,6 +98,13 @@ pair2 <- game %>% select(8, 14)
 str(pair2)
 
 pairs(pair2)
+
+### 정규성 검토
+sharipo_2 <- pair2[sample(nrow(pair2), size=5000), ]
+
+
+apply(sharipo_2, 2, shapiro.test)
+
 
 pos_rate <- as.vector(game[,8])
 dis_per <- as.vector(game[,14])

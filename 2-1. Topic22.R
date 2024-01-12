@@ -26,6 +26,8 @@ recom <- read.csv("recommendations_edit.csv")
 # Topic 2 유저 총 평가(rating)별 양상은 어떨까?
 # -----------------------------------------------------------------------------------
 
+
+
 game_r <- game %>% 
   mutate(rating = ifelse(rating == "Overwhelmingly Positive", "Very Positive", rating)) %>% 
   mutate(rating = ifelse(rating == "Overwhelmingly Negative", "Very Negative", rating)) %>% 
@@ -61,6 +63,8 @@ game_r_dis <- game_r_dis %>%
                            labels=(c(10,20,30,40,50,60,70,80,90,100)))) %>% 
   select(inds.rating, ind_dis_per)
 
+game_r %>% head()
+
 # heat map matrix
 
 heat_mat1 <- table(game_r_dis$inds.rating, game_r_dis$ind_dis_per)
@@ -84,7 +88,16 @@ ggplot(heat_mat1_df, aes(dis_per,  rating, fill= Freq)) +
 rm(game_r_dis); rm(heat_mat1_df); rm(heat_mat1);
 
 
+## 50~60% hist
 
+hist100 <- game_r %>% 
+  select(rating, discount_per) %>% 
+  filter(discount_per >= 90 & discount_per <= 100)
+
+hist100 %>% 
+  arrange(desc(discount_per)) %>% head()
+
+hist(hist100$discount_per)
 
 
 ## reviewer 플레이 시간(hours) 평균 ##
@@ -112,8 +125,8 @@ game_hour$avg_hours %>% summary()
 game_hour <- game_hour %>% 
   filter(!is.na(avg_hours)) %>% 
   mutate(ind_hours = cut(avg_hours,
-                           breaks = c(-1,4,9,14,19,24,499),
-                           labels=(c(5,10,15,20,25,500)))) %>% 
+                           breaks = c(-1,4,9,14,19,24,29,499),
+                           labels=(c(5,10,15,20,25,30,500)))) %>% 
   select(inds.rating, ind_hours)
 
 
@@ -138,8 +151,5 @@ ggplot(heat_mat2_df, aes(avg_hours,  rating, fill= Freq)) +
 
 
 str(heat_mat2_df)
-
-
-
 
 
