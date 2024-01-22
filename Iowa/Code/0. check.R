@@ -3,7 +3,8 @@ library(tidyverse)
 library(dplyr)
 library(lubridate)
 library(stringr)
-
+library(multilinguer)
+# library(KoNLP)
 
 
 # -----------------------------------------------------------------------------------
@@ -36,6 +37,9 @@ dim(data)
 data %>% summary()
 
 ## change type
+
+data <- data %>% 
+  mutate(Item.Number = as.integer(Item.Number))
 
 data <- data %>%
   mutate(Date = as.Date(Date, "%m/%d/%Y"))
@@ -172,6 +176,7 @@ check_store <- read_sheet(wdir,
 check_vendor <- read_sheet(wdir,
                           sheet = 'Check_Vendor',
                           col_names = T, na = '') %>% 
+  unique() %>% 
   select(-4, -5) %>% 
   filter(check == 1)
 
@@ -179,49 +184,134 @@ check_vendor <- read_sheet(wdir,
 # Processing Data
 #----------------------------------------------------------------
 
+data2019 <- data2019 %>% 
+  mutate(Store.Number = ifelse(Store.Number == 2190, 4829, Store.Number))
+
+#check change
+data2019 %>% filter(Store.Number == 2190) %>% nrow()
+
 ### Change duplicated Store, Vendor Names
-test <- data2019 %>%
-  mutate(Store.Name = ifelse(Store.Number %in% as.vector(check_store[,1]), 
-                         check_store$Store.Name, Store.Name)) %>% 
-  mutate(Vendor.Name = ifelse(Vendor.Number %in% as.vector(check_vendor[,1]), 
-                         check_vendor$Vendor.Name, Vendor.Name))
+data2019 <- data2019 %>% 
+  left_join(check_store, by = "Store.Number") %>% 
+  mutate(Store.Name = ifelse(!is.na(Store.Name.y), Store.Name.y, Store.Name.x)) %>% 
+  select(-Store.Name.x, -Store.Name.y) %>% 
+  left_join(check_vendor, by = "Vendor.Number") %>% 
+  mutate(Vendor.Name = ifelse(!is.na(Vendor.Name.y), Vendor.Name.y, Vendor.Name.x)) %>% 
+  select(-Vendor.Name.x, -Vendor.Name.y) %>%
+  select(-check.x, -check.y)
 
 
 ### count
-test %>% 
-  select(Store.Number, Store.Name) %>% unique() %>% nrow() #2656
-test %>%  
-  select(Vendor.Number, Vendor.Name) %>% unique() %>% nrow() #398
-  
-  
-data2019 %>%
-    select(Store.Number, Store.Name) %>% unique() %>% nrow()
+data2019 %>% names()
 
 data2019 %>% 
-    select(Vendor.Number, Vendor.Name) %>% unique() %>% nrow()
+  select(Store.Number, Store.Name) %>% unique() %>% nrow() #2464
 
+data2019 %>%  
+  select(Vendor.Number, Vendor.Name) %>% unique() %>% nrow() #368
 
-
+##### CHECK POINT2 #####
 
 
 ## Normalization
 ### Create Store
-
+data2019 %>% 
+  select(Store.Number, Store.Name, Address, City, Zip.Code, Store.Location) %>% 
+  unique() %>% nrow() #10318 <-- NEED CHECK
 
 
 ### Create Country
+data2019 %>% select(County.Number) %>% unique() %>% nrow()
+data2019 %>% select(County) %>% unique() %>% nrow()
+data2019 %>% 
+  select(County.Number, County) %>% 
+  unique() %>% nrow() #199 <-- NEED CHECK
 
+inds_county <- 
+  data2019 %>% 
+  select(County.Number, County) %>% 
+  filter(!is.na(County.Number)) %>% 
+  unique() %>%
+  arrange(County.Number)
 
 
 ### Create Vendor
+data2019 %>% 
+  select(Vendor.Number, Vendor.Name) %>% 
+  unique() %>% nrow() #368
 
+data2019 %>% 
+  select(Vendor.Number) %>% unique() %>% nrow()
 
 
 ### Create Item
+data2019 %>% 
+  select(Item.Number, Item.Description) %>% 
+  unique() %>% nrow() #9858
+
+data2019 %>% 
+  select(Item.Number) %>% unique() %>% nrow() #8663
 
 
+data2019 %>% 
+  select(Item.Number, Item.Description) %>% 
+  unique() %>% 
+  group_by(Item.Number) %>% 
+  mutate(cnt = n()) %>% 
+  group_by(cnt) %>% 
+  summarise(n=n())
+  
+
+check_item <- data2019 %>% 
+  select(Item.Number, Item.Description) %>% 
+  unique() %>% 
+  group_by(Item.Number) %>% 
+  mutate(cnt = n()) %>% 
+  arrange(cnt, Item.Number) %>% 
+  select(cnt, Item.Number, Item.Description)
+
+# check_item %>% 
+#   filter(cnt > 1) %>% 
+#   sheet_write(out.sheet, sheet = 'Check_item')
+
+###????
+check_item2 <- check_item %>%
+  select(Item.Number, Item.Description) %>% unique() %>% 
+  mutate(Description2 = str_replace_all(Item.Description,"[^a-zA-Z0-9]","")) %>% 
+  mutate(Description2 = str_replace_all(Description2, "YR", "YEAR")) %>% 
+  select(-Item.Description) %>%
+  unique() %>% 
+  group_by(Item.Number) %>% 
+  mutate(cnt = n()) %>% 
+  select(-Description2) %>% 
+  left_join(check_item %>% select(Item.Number, Item.Description), by="Item.Number") %>% 
+  head()
 
 
+check_item2 %>%
+  filter(cnt > 1) %>%
+  sheet_write(out.sheet, sheet = 'Check_item')
+
+
+mutate(data =
+         str_replace_all(data,"<(/)?([a-zA-Z0-9]*)(\\s[a-zA-Z0-9]*=[^>]*)?(\\s)*(/)?>"," ")) %>%
+  mutate(data =
+           str_replace_all(data,"&nbsp"," ")) %>%
+  mutate(data =
+           gsub("\\*","",data)) %>%
+  mutate(data =
+           gsub("&gt;"," ",data)) %>%
+  mutate(data =
+           gsub("&lt;"," ", data)) %>%
+  mutate(data =
+           str_replace_all(data,"\t"," ")) %>%
+  mutate(data =
+           str_replace_all(data,"\\s+"," "))
+
+
+### Create Invoice
+data2019 %>% 
+  select(Invoice.Item.Number, Date, Store.Number, County.Number, Category, Vendor.Number, Item.Number, Pack, State.Bottle.Retail, Bottles.Sold, Sale..Dollars., Volume.Sold..Liters.)
 
 ### 
 
