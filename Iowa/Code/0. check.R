@@ -21,6 +21,8 @@ library(multilinguer)
 
 wdir <- 'https://docs.google.com/spreadsheets/d/1a1rbVgVJp6n6xd8r7Qxu1WTwo-9n1cnzd_7lk7FX6fM/'
 
+wdir_inds <- 'https://docs.google.com/spreadsheets/d/1xZHyQzYe6uEus_39sGXcR9UXz_mrjxnxffrtHzMp3Kk/'
+
 ### Data;
 setwd("./Data")
 # data <- read.csv("Iowa_Liquor_Sales.csv")
@@ -214,15 +216,161 @@ data2019 %>%
 
 
 ## Normalization
-### Create Store
+### Create inds_store
 data2019 %>% 
   select(Store.Number, Store.Name, Address, City, Zip.Code, Store.Location) %>% 
   unique() %>% nrow() #10318 <-- NEED CHECK
 
+### PK-Store
+data2019 %>% 
+  select(Store.Number) %>% 
+  unique() %>% nrow() #2464
 
-### Create Country
-data2019 %>% select(County.Number) %>% unique() %>% nrow()
-data2019 %>% select(County) %>% unique() %>% nrow()
+data2019 %>% 
+  select(Store.Number, Store.Name) %>% unique() %>% nrow() #2464
+
+#[ Address ]
+check_address <- data2019 %>% 
+  select(Store.Name, Address) %>% 
+  filter(!str_equal(Address, "")) %>% 
+  mutate(Address = str_to_upper(Address)) %>% 
+  mutate(Address = str_replace_all(Address, "[:punct:]", "")) %>% 
+  mutate(Address = str_replace_all(Address, "\n", "")) %>% 
+  mutate(Address = str_replace_all(Address, c("ST$"="STREET", 
+                                              "DR$" = "DRIVE", 
+                                              "RD$" = "ROAD", 
+                                              "AVE$" = "AVENUE",
+                                              "HWY" = "HIGHWAY"))) %>% 
+  unique() %>% 
+  group_by(Store.Name) %>%
+  mutate(n = n()) %>% 
+  filter(n > 1) %>% 
+  arrange(Store.Name)
+
+
+# check_address %>%
+#   sheet_write(out.sheet,
+#               sheet = 'Check_address')
+
+#### -> delete Address
+
+# [Zip.Code ]
+data2019 %>% 
+  select(Store.Number, Zip.Code) %>% unique() %>% nrow() #2541
+
+#### -> delete Zip.code
+
+# [ City & County ]
+data2019 %>% 
+  select(Store.Number, City) %>% unique() %>% nrow() #2537
+
+check_city <- data2019 %>% 
+  select(Store.Number, City) %>% 
+  unique() %>% 
+  filter(!str_equal(City, "")) %>% 
+  mutate(City = str_replace_all(City, " ", "")) %>% 
+  unique() %>%  
+  group_by(Store.Number) %>% 
+  mutate(n = n()) %>% 
+  filter(n > 1) %>% 
+  arrange(Store.Number)
+
+# check_city %>%
+#   sheet_write(out.sheet,
+#               sheet = 'Check_city')
+
+
+data2019 %>% 
+  select(City) %>% unique() %>% nrow() #473
+
+temp_city <- data2019 %>% select(Store.Number, City, Date) %>% 
+  filter(Store.Number == 5619)
+
+table(temp_city$City)
+
+temp_city %>% 
+  select(-Store.Number) %>% 
+  arrange(City, Date) %>%
+  group_by(City) %>% slice(1:1)
+
+# rm(temp_city)
+
+#check city&county -> city 473개
+data2019 %>% 
+  select(City) %>% unique() %>% nrow()
+
+data2019 %>% 
+  select(City, County.Number) %>% 
+  mutate(City = ifelse(City == "OTUMWA", "OTTUMWA", City)) %>% 
+  unique() %>% 
+  group_by(City) %>% 
+  mutate(n = n()) %>% 
+  filter(n > 1)
+
+
+
+data2019 %>% 
+  select(City, County.Number) %>% 
+  mutate(City = ifelse(City, "OTUMWA", "OTTUMWA")) %>% 
+  filter(!is.na(County.Number)) %>% 
+  filter(!is.na(City)) %>% 
+  unique() %>% 
+  group_by(City) %>% 
+  mutate(n = n()) %>% 
+  filter(n > 1) %>% nrow()  #0!!!!
+
+
+#### final 
+check_add <- data2019 %>% 
+  select(City, County.Number, County) %>% 
+  filter(!str_equal(County.Number, "")) %>% 
+  filter(!str_equal(City, "")) %>% 
+  unique() %>% 
+  mutate(City = str_replace_all(City, " ", "")) %>% 
+  mutate(City = ifelse(City == "OTUMWA", "OTTUMWA", City)) %>% 
+  unique() %>% 
+  group_by(City) %>% 
+  mutate(n = n()) %>% 
+    filter(n > 1) %>% 
+    arrange(City)
+
+# check_add %>%
+#   write_sheet(out.sheet,
+#               sheet = 'check_add')
+
+##### CHECK POINT 3 #####
+
+# rm(check_add)
+
+inds_store <- data2019 %>% 
+  select(Store.Number, Store.Name, City) %>% 
+  filter(!str_equal(City, "")) %>%
+  unique() %>% 
+  mutate(City = str_replace_all(City, " ", "")) %>% 
+  mutate(City = ifelse(City == "OTUMWA", "OTTUMWA", City)) %>% 
+  mutate(City = ifelse(Store.Number == 5619, 
+                       ifelse(City == "EVANSDALE", "ELKRUNHEIGHTS", City), City)) %>% 
+  unique()
+
+
+### Create inds_city
+data2019 %>% 
+  select(City, County.Number) %>% 
+  unique() %>% 
+  filter(!str_equal(County.Number, "")) %>% 
+  filter(!str_equal(City, "")) %>% 
+  nrow()
+
+inds_city <- data2019 %>% 
+  select(City, County.Number) %>% 
+  unique()
+
+
+### Create inds_country
+data2019 %>% select(County.Number) %>% unique() %>% nrow() #100
+
+data2019 %>% select(County) %>% unique() %>% nrow() #99
+
 data2019 %>% 
   select(County.Number, County) %>% 
   unique() %>% nrow() #199 <-- NEED CHECK
@@ -235,16 +383,20 @@ inds_county <-
   arrange(County.Number)
 
 
-### Create Vendor
+### Create inds_Vendor
 data2019 %>% 
   select(Vendor.Number, Vendor.Name) %>% 
   unique() %>% nrow() #368
 
 data2019 %>% 
-  select(Vendor.Number) %>% unique() %>% nrow()
+  select(Vendor.Number) %>% unique() %>% nrow() #368
+
+inds_vendor <- data2019 %>% 
+  select(Vendor.Number, Vendor.Name) %>% 
+  unique()
 
 
-### Create Item
+### Create inds_item
 data2019 %>% 
   select(Item.Number, Item.Description) %>% 
   unique() %>% nrow() #9858
@@ -253,67 +405,38 @@ data2019 %>%
   select(Item.Number) %>% unique() %>% nrow() #8663
 
 
-data2019 %>% 
-  select(Item.Number, Item.Description) %>% 
-  unique() %>% 
-  group_by(Item.Number) %>% 
-  mutate(cnt = n()) %>% 
-  group_by(cnt) %>% 
-  summarise(n=n())
-  
-
-check_item <- data2019 %>% 
-  select(Item.Number, Item.Description) %>% 
-  unique() %>% 
-  group_by(Item.Number) %>% 
-  mutate(cnt = n()) %>% 
-  arrange(cnt, Item.Number) %>% 
-  select(cnt, Item.Number, Item.Description)
-
-# check_item %>% 
-#   filter(cnt > 1) %>% 
-#   sheet_write(out.sheet, sheet = 'Check_item')
-
-###????
-check_item2 <- check_item %>%
-  select(Item.Number, Item.Description) %>% unique() %>% 
-  mutate(Description2 = str_replace_all(Item.Description,"[^a-zA-Z0-9]","")) %>% 
-  mutate(Description2 = str_replace_all(Description2, "YR", "YEAR")) %>% 
-  select(-Item.Description) %>%
-  unique() %>% 
-  group_by(Item.Number) %>% 
-  mutate(cnt = n()) %>% 
-  select(-Description2) %>% 
-  left_join(check_item %>% select(Item.Number, Item.Description), by="Item.Number") %>% 
-  head()
+inds_item <- data2019 %>% 
+  select(Item.Number, Item.Description, Date) %>% 
+  arrange(Item.Number, desc(Date)) %>%
+  group_by(Item.Number) %>% slice(1:1)
 
 
-check_item2 %>%
-  filter(cnt > 1) %>%
-  sheet_write(out.sheet, sheet = 'Check_item')
 
 
-mutate(data =
-         str_replace_all(data,"<(/)?([a-zA-Z0-9]*)(\\s[a-zA-Z0-9]*=[^>]*)?(\\s)*(/)?>"," ")) %>%
-  mutate(data =
-           str_replace_all(data,"&nbsp"," ")) %>%
-  mutate(data =
-           gsub("\\*","",data)) %>%
-  mutate(data =
-           gsub("&gt;"," ",data)) %>%
-  mutate(data =
-           gsub("&lt;"," ", data)) %>%
-  mutate(data =
-           str_replace_all(data,"\t"," ")) %>%
-  mutate(data =
-           str_replace_all(data,"\\s+"," "))
+#### Print Inds ####
+out.sheet2 <- gs4_get(wdir_inds)
+
+# inds_county %>%
+#   arrange(County.Number) %>% 
+#   write_sheet(out.sheet2,
+#               sheet = 'inds_county')
+
+# inds_item %>%
+#   arrange(Item.Number) %>% 
+#   write_sheet(out.sheet2,
+#               sheet = 'inds_item')
+
+# inds_vendor %>%
+#   arrange(Vendor.Number) %>%
+#   write_sheet(out.sheet2,
+#               sheet = 'inds_vendor')
+
+# inds_store %>%
+#   arrange(Store.Number) %>%
+#   write_sheet(out.sheet2,
+#               sheet = 'inds_store')
 
 
-### Create Invoice
-data2019 %>% 
-  select(Invoice.Item.Number, Date, Store.Number, County.Number, Category, Vendor.Number, Item.Number, Pack, State.Bottle.Retail, Bottles.Sold, Sale..Dollars., Volume.Sold..Liters.)
-
-### 
 
 
 
