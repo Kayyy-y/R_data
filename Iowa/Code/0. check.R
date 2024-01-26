@@ -4,7 +4,7 @@ library(dplyr)
 library(lubridate)
 library(stringr)
 library(multilinguer)
-# library(KoNLP)
+
 
 
 # -----------------------------------------------------------------------------------
@@ -212,8 +212,6 @@ data2019 %>%
 data2019 %>%  
   select(Vendor.Number, Vendor.Name) %>% unique() %>% nrow() #368
 
-##### CHECK POINT2 #####
-
 
 ## Normalization
 ### Create inds_store
@@ -308,7 +306,6 @@ data2019 %>%
   filter(n > 1)
 
 
-
 data2019 %>% 
   select(City, County.Number) %>% 
   mutate(City = ifelse(City, "OTUMWA", "OTTUMWA")) %>% 
@@ -338,9 +335,9 @@ check_add <- data2019 %>%
 #   write_sheet(out.sheet,
 #               sheet = 'check_add')
 
-##### CHECK POINT 3 #####
 
 # rm(check_add)
+
 
 inds_store <- data2019 %>% 
   select(Store.Number, Store.Name, City) %>% 
@@ -353,17 +350,29 @@ inds_store <- data2019 %>%
   unique()
 
 
-### Create inds_city
-data2019 %>% 
-  select(City, County.Number) %>% 
-  unique() %>% 
-  filter(!str_equal(County.Number, "")) %>% 
-  filter(!str_equal(City, "")) %>% 
-  nrow()
 
-inds_city <- data2019 %>% 
-  select(City, County.Number) %>% 
-  unique()
+### Create inds_iowa (City + County)
+# <- 외부 데이터 사용. 실제 Iowa city/county 데이터
+# *세부사항 Notion EDA&Q.1 참조
+
+inds_iowa <- read_sheet(wdir_inds,
+                        sheet = 'inds_iowa',
+                        col_names = T, na = '')
+
+head(inds_iowa)
+
+names(inds_iowa) <- c('City', 'County1', 'County2', 'County3')
+
+inds_iowa <- inds_iowa %>% 
+  pivot_longer(cols = starts_with("County"), names_to = "County") %>%
+  filter(!is.na(value)) %>%
+  mutate(County = value) %>%
+  select(-value)
+
+inds_iowa <- inds_iowa %>% 
+  mutate(region_id = seq_len(nrow(inds_iowa))) %>% 
+  select(region_id, City, County)
+
 
 
 ### Create inds_country
@@ -383,6 +392,7 @@ inds_county <-
   arrange(County.Number)
 
 
+
 ### Create inds_Vendor
 data2019 %>% 
   select(Vendor.Number, Vendor.Name) %>% 
@@ -394,6 +404,7 @@ data2019 %>%
 inds_vendor <- data2019 %>% 
   select(Vendor.Number, Vendor.Name) %>% 
   unique()
+
 
 
 ### Create inds_item
@@ -411,6 +422,18 @@ inds_item <- data2019 %>%
   group_by(Item.Number) %>% slice(1:1)
 
 
+### Create inds_category
+data2019 %>% 
+  select(Category) %>% 
+  unique() %>% nrow() #62
+
+data2019 %>% 
+  select(Category, Category.Name) %>% 
+  unique() %>% nrow() #62
+
+inds_category <- data2019 %>% 
+  select(Category, Category.Name) %>% 
+  unique()
 
 
 #### Print Inds ####
@@ -436,7 +459,13 @@ out.sheet2 <- gs4_get(wdir_inds)
 #   write_sheet(out.sheet2,
 #               sheet = 'inds_store')
 
+# inds_iowa %>%
+#   arrange(region_id) %>%
+#   write_sheet(out.sheet2,
+#               sheet = 'inds_iowa')
 
-
-
+# inds_category %>%
+#   arrange(Category) %>%
+#   write_sheet(out.sheet2,
+#               sheet = 'inds_category')
 
